@@ -1,0 +1,101 @@
+                        !!!!    建議使用NOTPADE++開啟     !!!!
+====================================================================================                        
+PURPOSE     :   FOR C2080 INTRANET SETTING
+RELEASE DATE: 	2019/11/5
+編輯人員	:	Reliability  Eric_Lio
+如有錯誤或問題請直接聯繫我修訂，感謝大家
+====================================================================================                        
+V3: 補齊PMDU硬體上位置的名稱，方便對照及後續確認1G Switch的手段。
+===========================  ARISTA DCS-7260CX3-64 (4U)  ===========================  
+Baud rate :9600
+100g Cable - 50G 一對二
+
+$show interfaces status							#很重要 隨時都可以檢查
+
+登錄帳號/密碼 : admin/免輸入
+
+$ zerotouch cancel								#輸入後會重開機
+========================= Cycle 再次登入後 =========================================
+$ enable
+$ configure terminal
+$ interface Ethernet 1/1-64/1 		            #選擇1-64的port ，65 66是10G port故不設定
+                                
+$ speed forced 100gfull							#把每個port的速度都拉到100G
+$ show interfaces status						#檢查用，會發現有有些port是routed
+
+localhost(config-if-Et1/1,1/3,2/1,...1/3-32/1,32/3)#show interfaces status
+Port       Name           Status       Vlan     Duplex Speed  Type         Flags
+Et1/1                     notconnect   1        full   100G    100GBASE-CR4
+Et2/1                     notconnect   1        full   100G    Not Present
+Et3/1                     notconnect   1        full   100G    Not Present
+
+$ switchport									#把所有port都拉成switchport
+
+localhost(config-if-Et1/1,1/3,2/1,...1/3-32/1,32/3)#show interfaces status
+Port       Name           Status       Vlan     Duplex Speed  Type         Flags
+Et1/1                     notconnect   1        full   100G    100GBASE-CR4
+Et2/1                     notconnect   1        full   100G    Not Present
+Et3/1                     notconnect   1        full   100G    Not Present
+
+$ show interfaces status						#檢查用，檢查是否拉成switchport，會發現有些port接著cable卻notconnect
+$ no error-correction encoding					#不清楚背後行為動作，但根據ICE的下過的command不下有時會有問題
+$ shutdown                                      #不會真的關機
+$ no shutdown									#經過shutdown no_shutdown重啟後後可以變成將接上的port connect
+$ show interfaces status						#檢查用
+$ copy running-config startup-config			#把當前正在執行的config拉到start-up(開機自動執行的config
+
+#!之後再請確認各CABLE是否可以連線以及機台NIC是否正常!#
+
+
+================================     RM 固定IP    ================================  
+NB 皆在上方RJ3 (DIGI)
+Serial port Baw Rate SPEED: 115200
+Switch 接在IOIOI PORT(1G switch 右下角的port，無LED燈號)，RM皆在上方RJ4(MGMT CONSOLE)
+帳號 / 密碼 : root / $pl3nd1D
+
+$ show network interface -i eth1   												#先檢ETH1是否正常
+
+WcsCli# show network interface -i eth1 											#IP 在48U與42會有差異請注意
+    Health: Ok
+    IPv4Addresses:
+        Address: 172.17.0.202
+        AddressOrigin: Static
+        Gateway: None
+        SubnetMask: 255.255.255.252
+    IPv6Addresses:
+        Address:
+        AddressOrigin:
+        PrefixLength:
+    Id: eth1
+    LinkStatus: LinkDown
+    MACAddress: F0:1D:BC:FB:77:C1
+    State: Up
+    Completion Code: Success
+
+$ set network static -i eth0 -a 192.168.0.101 -s 255.255.255.0 					
+#固定ETH1 IP COMPUTE與RM之間的跳板，此處IP可以自行設定
+
+WcsCli# set network static -i eth0 -a 192.168.0.101 -s 255.255.255.0
+    Completion Code: Success
+
+$ set manager firewall off														#關閉防火牆
+
+WcsCli# set manager firewall off
+    Completion Code: Success
+================================        透過RM設定1G Switch        ================================
+$ set switch config  															#自動設定1G Switch config
+成功
+1.WcsCli# set switch config
+    Completion Code: Success
+失敗
+2.WcsCli# set switch config
+    ErrorCode: 110
+    Status Description: Failed to login to the switch console: Connection timed out
+    Completion Code: Failure
+
+另外接一條NIC2 到1G Switch 25號port上，LED2燈號接亮起基本上就通了
+接著可以使用 $ sh manager inventory 或$ sh switch port -p 25 來檢查，如果回應皆正常恭喜你完成設定 
+接著就可以把PMDU上RJ3,4的線拆掉之後透過NIC1 IP去遠端控制RM
+================================        RM FW flash        ================================
+BIOS FW: set system bios update -i <幾U> -f <檔案名稱>
+BMC FW: set system bmc update -i <幾U> -f <檔案名稱>
